@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Auditoria do abatimento do saldo devedor FIES a partir do extrato da Caixa ou do Banco do Brasil.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%231e2f4f%22/%3E%3Cpath d=%22M9 24v-9M14 24v-9M18 24v-9M23 24v-9M6 27h20M16 5l10 6H6z%22 stroke=%22white%22 stroke-width=%222%22 fill=%22none%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<title>FIES Auditor</title>
+<style>
+html { color-scheme: light; } body { margin: 0; } img { max-width: 100%; }
+
+/* Layout: cabeçalho fixo + coluna central de 72rem — réplica fiel do app Lovable (shadcn, azul-marinho institucional) */
+:root {
+  --radius: .625rem;
+  --background: oklch(97.5% .006 247);
+  --foreground: oklch(21% .04 262);
+  --card: oklch(100% 0 0);
+  --primary: oklch(32% .075 258);
+  --primary-foreground: oklch(98.5% .003 248);
+  --muted: oklch(95.5% .01 250);
+  --muted-foreground: oklch(52% .03 258);
+  --destructive: oklch(57.7% .245 27.325);
+  --success: oklch(58% .13 160);
+  --success-foreground: oklch(98.5% .003 160);
+  --warning: oklch(66.6% .179 58.318);
+  --border: oklch(91% .012 255);
+  --ring: oklch(45% .08 258);
+  --shadow: 0 1px 3px 0 rgb(15 23 42 / .08), 0 1px 2px -1px rgb(15 23 42 / .08);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: oklch(12.9% .042 264.695); --foreground: oklch(98.4% .003 247.858);
+    --card: oklch(20.8% .042 265.755); --primary: oklch(92.9% .013 255.508);
+    --primary-foreground: oklch(20.8% .042 265.755); --muted: oklch(27.9% .041 260.031);
+    --muted-foreground: oklch(70.4% .04 256.788); --destructive: oklch(70.4% .191 22.216);
+    --success: oklch(70% .14 160); --success-foreground: oklch(15% .03 160);
+    --warning: oklch(76.9% .188 70.08);
+    --border: oklch(100% 0 0 / .1); --ring: oklch(55.1% .027 264.364);
+    --shadow: 0 1px 3px 0 rgb(0 0 0 / .3);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --background: oklch(12.9% .042 264.695); --foreground: oklch(98.4% .003 247.858);
+  --card: oklch(20.8% .042 265.755); --primary: oklch(92.9% .013 255.508);
+  --primary-foreground: oklch(20.8% .042 265.755); --muted: oklch(27.9% .041 260.031);
+  --muted-foreground: oklch(70.4% .04 256.788); --destructive: oklch(70.4% .191 22.216);
+  --success: oklch(70% .14 160); --success-foreground: oklch(15% .03 160);
+  --warning: oklch(76.9% .188 70.08);
+  --border: oklch(100% 0 0 / .1); --ring: oklch(55.1% .027 264.364);
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / .3);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; border-color: var(--border); }
+[hidden] { display: none !important; }
+body { background: var(--background); color: var(--foreground); font-family: var(--font-sans); font-size: 14px; line-height: 1.5; min-height: 100vh; display: flex; flex-direction: column; }
+svg.i { width: 1em; height: 1em; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.wrap { width: 100%; max-width: 72rem; margin-inline: auto; padding-inline: 16px; }
+@media (min-width: 640px) { .wrap { padding-inline: 24px; } }
+
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; border-bottom: 1px solid var(--border); background: color-mix(in oklch, var(--card) 95%, transparent); backdrop-filter: blur(8px); }
+header.top .wrap { height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-mark { width: 36px; height: 36px; border-radius: 8px; background: var(--primary); color: var(--primary-foreground); display: grid; place-items: center; font-size: 20px; }
+.brand h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -.015em; }
+
+.btn { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border-radius: calc(var(--radius) - 2px); border: 1px solid var(--border); background: var(--background); color: var(--foreground); font: 500 12px/1 var(--font-sans); cursor: pointer; box-shadow: var(--shadow); transition: background .15s; white-space: nowrap; }
+.btn:hover:not(:disabled) { background: var(--muted); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn svg.i { font-size: 16px; }
+:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+main { flex: 1; display: grid; gap: 24px; padding-block: 32px; align-content: start; }
+.intro { max-width: 42rem; }
+.intro h2 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -.02em; line-height: 1.25; text-wrap: balance; }
+.intro p { margin: 8px 0 0; color: var(--muted-foreground); font-size: 14px; }
+@media (min-width: 640px) { .intro h2 { font-size: 30px; } .intro p { font-size: 16px; } }
+
+.fields { display: grid; gap: 16px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
+@media (min-width: 640px) { .fields { grid-template-columns: 1fr 1fr; } }
+.field { display: grid; gap: 6px; align-content: start; min-width: 0; }
+.field label { font-size: 14px; font-weight: 500; line-height: 1; }
+.input { height: 36px; width: 100%; border-radius: calc(var(--radius) - 2px); border: 1px solid var(--border); background: transparent; color: var(--foreground); padding: 4px 12px; font: 16px var(--font-sans); box-shadow: var(--shadow); }
+@media (min-width: 768px) { .input { font-size: 14px; } }
+.input::placeholder { color: var(--muted-foreground); }
+.input:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--ring); }
+.input[aria-invalid="true"] { border-color: var(--destructive); }
+.input[aria-invalid="true"]:focus-visible { box-shadow: 0 0 0 1px var(--destructive); }
+.input:disabled { opacity: .5; cursor: not-allowed; }
+.hint { margin: 0; font-size: 12px; color: var(--muted-foreground); }
+.hint.err { color: var(--destructive); }
+
+.drop { min-height: 224px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 40px 24px; text-align: center; border: 2px dashed var(--border); border-radius: 16px; background: var(--card); cursor: pointer; transition: border-color .15s, background .15s; }
+.drop:hover, .drop.over { border-color: color-mix(in oklch, var(--primary) 60%, transparent); background: color-mix(in oklch, var(--primary) 5%, var(--card)); }
+.drop.over { border-color: var(--primary); }
+.drop.busy { cursor: wait; opacity: .9; }
+.drop-icon { width: 56px; height: 56px; border-radius: 999px; background: color-mix(in oklch, var(--primary) 10%, transparent); color: var(--primary); display: grid; place-items: center; font-size: 28px; }
+.drop .t { margin: 0; font-size: 16px; font-weight: 600; }
+.drop .s { margin: 0; max-width: 24rem; font-size: 14px; color: var(--muted-foreground); }
+.spin { font-size: 40px; color: var(--primary); animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation-duration: 3s; } }
+
+.card { border: 1px solid var(--border); border-radius: 12px; background: var(--card); box-shadow: var(--shadow); min-width: 0; }
+.stats { display: grid; gap: 16px; }
+@media (min-width: 640px) { .stats { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 1280px) { .stats { grid-template-columns: repeat(4, 1fr); } }
+.stat { padding: 24px; }
+.stat-head { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; color: var(--muted-foreground); font-size: 14px; font-weight: 500; }
+.stat-head svg.i { color: var(--primary); font-size: 20px; }
+.stat-val { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.015em; font-variant-numeric: tabular-nums; }
+@media (min-width: 640px) { .stat-val { font-size: 24px; } }
+.stat-hint { margin: 4px 0 0; font-size: 12px; color: var(--muted-foreground); }
+
+.cmp { border-color: color-mix(in oklch, var(--success) 40%, transparent); background: color-mix(in oklch, var(--success) 5%, var(--card)); padding: 24px; display: grid; gap: 16px; }
+.cmp-title { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; color: var(--muted-foreground); }
+.badge { display: inline-flex; align-items: center; gap: 4px; border-radius: 6px; border: 1px solid transparent; padding: 2px 10px; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.badge.warn { border-color: color-mix(in oklch, var(--warning) 50%, transparent); color: var(--warning); }
+.badge.ok { background: var(--success); color: var(--success-foreground); }
+.flow { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+@media (min-width: 640px) { .flow { flex-direction: row; align-items: center; gap: 24px; } .flow .badge.ok { margin-left: auto; } .flow .arrow { transform: rotate(-90deg); } }
+.lbl { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted-foreground); }
+.big { margin: 0; font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mid { margin: 0; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pos { color: var(--success); }
+.neg { color: var(--destructive); }
+.arrow { font-size: 24px; color: var(--success); }
+.sub { border-top: 1px solid color-mix(in oklch, var(--success) 20%, transparent); padding-top: 16px; }
+.sub h3 { margin: 0 0 12px; font-size: 14px; font-weight: 500; }
+.ref-grid { display: grid; gap: 16px; }
+@media (min-width: 640px) { .ref-grid { grid-template-columns: repeat(4, 1fr); } }
+.notes { margin: 0; border-top: 1px solid color-mix(in oklch, var(--success) 20%, transparent); padding-top: 12px; font-size: 12px; color: var(--muted-foreground); white-space: pre-wrap; }
+
+.hist-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 24px; }
+.hist-head h3 { margin: 0; font-size: 16px; font-weight: 600; }
+.table-box { overflow-x: auto; padding: 0 24px 24px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+th { height: 40px; padding: 0 8px; text-align: left; font-weight: 500; color: var(--muted-foreground); border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover { background: color-mix(in oklch, var(--muted) 50%, transparent); }
+.r { text-align: right; }
+td.file { max-width: 13rem; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+
+footer { border-top: 1px solid var(--border); padding-block: 24px; }
+footer p { margin: 0; font-size: 12px; color: var(--muted-foreground); }
+.notice { font-size: 12px; color: var(--muted-foreground); }
+
+#toasts { position: fixed; z-index: 50; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 8px; width: min(356px, calc(100vw - 32px)); }
+.toast { display: flex; gap: 10px; align-items: flex-start; padding: 14px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--foreground); box-shadow: 0 4px 12px rgb(0 0 0 / .1); font-size: 13px; animation: tin .2s ease-out; }
+.toast svg.i { font-size: 18px; margin-top: 1px; }
+.toast.success svg.i { color: var(--success); } .toast.error svg.i { color: var(--destructive); } .toast.warning svg.i { color: var(--warning); } .toast.info svg.i { color: var(--primary); }
+@keyframes tin { from { opacity: 0; transform: translateY(8px); } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-landmark" viewBox="0 0 24 24"><path d="M10 18v-7"/><path d="M11.12 2.198a2 2 0 0 1 1.76.006l7.866 3.847c.476.233.31.949-.22.949H3.474c-.53 0-.695-.716-.22-.949z"/><path d="M14 18v-7"/><path d="M18 18v-7"/><path d="M3 22h18"/><path d="M6 18v-7"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 13v8"/><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="m8 17 4-4 4 4"/></symbol>
+  <symbol id="i-fileup" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 12v6"/><path d="m15 15-3-3-3 3"/></symbol>
+  <symbol id="i-loader" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></symbol>
+  <symbol id="i-building" viewBox="0 0 24 24"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-coins" viewBox="0 0 24 24"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></symbol>
+</svg>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <span class="brand-mark"><svg class="i" aria-hidden="true"><use href="#i-landmark"/></svg></span>
+      <h1>FIES Auditor</h1>
+    </div>
+    <button class="btn" id="clear" type="button" disabled><svg class="i" aria-hidden="true"><use href="#i-trash"/></svg>Limpar dados</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="intro">
+    <h2>Auditoria de abatimento do saldo devedor</h2>
+    <p>Envie a planilha de evolução contratual do FIES emitida pela Caixa ou pelo Banco do Brasil. Identificamos automaticamente o abatimento, a data de aplicação e a redução do saldo devedor.</p>
+  </div>
+
+  <div class="fields">
+    <div class="field">
+      <label for="reference-month">Mês do saldo a ser abatido (opcional)</label>
+      <input class="input" id="reference-month" inputmode="numeric" autocomplete="off" placeholder="MM/AAAA">
+      <p class="hint" id="reference-hint">Mês do ajuizamento ou a competência fixada em sentença. Consideramos o último saldo do extrato até o fim desse mês.</p>
+    </div>
+    <div class="field">
+      <label for="expected-percent">Percentual devido (%)</label>
+      <input class="input" id="expected-percent" inputmode="decimal" placeholder="Ex.: 26" autocomplete="off">
+      <p class="hint">Quanto deveria ter sido abatido sobre o saldo devedor desse mês.</p>
+    </div>
+  </div>
+
+  <div class="drop" id="drop" role="button" tabindex="0" aria-label="Enviar planilha PDF do FIES">
+    <input type="file" id="file" accept="application/pdf,.pdf" hidden>
+    <div id="drop-idle" style="display:contents">
+      <div class="drop-icon"><svg class="i" id="drop-ico" aria-hidden="true"><use href="#i-upload"/></svg></div>
+      <p class="t">Arraste o PDF da evolução contratual do FIES</p>
+      <p class="s">ou clique para escolher o arquivo. Aceitamos planilhas emitidas pela Caixa ou pelo Banco do Brasil (.pdf, um por vez).</p>
+    </div>
+    <div id="drop-busy" style="display:contents" hidden>
+      <svg class="i spin" aria-hidden="true"><use href="#i-loader"/></svg>
+      <p class="t" id="busy-t">Processando documento...</p>
+      <p class="s">Estamos lendo o PDF e aplicando as regras de auditoria do FIES.</p>
+    </div>
+  </div>
+
+  <section id="summary" aria-label="Resumo do abatimento" style="display:grid;gap:16px" hidden></section>
+  <section id="history" class="card" hidden></section>
+</main>
+
+<footer>
+  <p class="wrap">O PDF é lido no seu próprio navegador e não é enviado a nenhum servidor. Os dados ficam apenas nesta sessão e não são armazenados. Confira sempre os valores com o documento original do banco.</p>
+</footer>
+<div id="toasts" aria-live="polite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script>
+// FIES Auditor — leitura por regras fixas (sem IA).
+// Recebe o texto extraído pelo pdf.js (uma linha por linha visual, com marcadores de página)
+// e devolve o mesmo objeto que o app do Lovable recebia da IA.
+(function (root) {
+  const MONEY = /[+-]?\d{1,3}(?:\.\d{3})*,\d{2}/g;
+  const toNum = (s) => Number(s.replace(/[+\s]/g, "").replace(/\./g, "").replace(",", "."));
+  const round2 = (n) => Math.round(n * 100) / 100;
+  const brl = (n) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  class AuditError extends Error {}
+
+  // "dd/mm/aaaa" ou "dd.mm.aaaa" -> número aaaammdd, para comparar datas
+  const dateKey = (d) => { const [dd, mm, yy] = d.split(/[./]/); return Number(yy + mm + dd); };
+  const toBr = (d) => d.replace(/\./g, "/");
+  function monthEndKey(ref) { // "MM/AAAA" -> último dia do mês como aaaammdd
+    const [mm, yy] = ref.split("/").map(Number);
+    return yy * 10000 + mm * 100 + 31;
+  }
+
+  function detectBank(text) {
+    if (/SISBB|Saldo\s+parcial/i.test(text) && /\d{2}\.\d{2}\.\d{4}/.test(text)) return "BANCO_DO_BRASIL";
+    if (/Saldo\s*Te[oó]rico|PLANILHA DE EVOLU|Desconto de 1\s*%|caixa/i.test(text) && /\d{2}\/\d{2}\/\d{4}/.test(text)) return "CAIXA";
+    return null;
+  }
+
+  // ---------------- CAIXA ----------------
+  // Linha: dd/mm/aaaa  Descrição  [Prest.]  Valor  ±Movimento  [Capital] [Juros]  Saldo Teórico
+  function caixaRows(text) {
+    const rows = [];
+    for (const raw of text.split("\n")) {
+      const line = raw.trim();
+      const m = /^(\d{2}\/\d{2}\/\d{4})\s+(.*)$/.exec(line);
+      if (!m) continue;
+      const nums = m[2].match(MONEY);
+      if (!nums || nums.length < 2) continue;
+      const desc = m[2].slice(0, m[2].search(/\s[+-]?\d{1,3}(?:\.\d{3})*,\d{2}/) + 1 || undefined).trim();
+      rows.push({ date: m[1], key: dateKey(m[1]), desc, saldo: toNum(nums[nums.length - 1]) });
+    }
+    return rows;
+  }
+
+  function parseCaixa(text, referenceMonth) {
+    const rows = caixaRows(text);
+    if (rows.length < 3) throw new AuditError("Não encontramos as movimentações da planilha da Caixa neste PDF.");
+    const isDesc = (r) => /desconto\s+de\s+1\s*%?/i.test(r.desc);
+    const blocks = [];
+    for (let i = 0; i < rows.length; i++) {
+      if (!isDesc(rows[i])) continue;
+      const start = i;
+      while (i + 1 < rows.length && isDesc(rows[i + 1])) i++;
+      blocks.push({ start, end: i });
+    }
+    if (!blocks.length) throw new AuditError("Não encontramos lançamentos de \"Desconto de 1%\" nesta planilha da Caixa. O abatimento ainda não foi aplicado ou o arquivo é de outro período.");
+    const events = blocks.map(({ start, end }) => {
+      const before = rows[start - 1];
+      const last = rows[end];
+      return {
+        date: rows[start].date, key: rows[start].key, months: end - start + 1,
+        originalBalance: before ? before.saldo : null, newBalance: last.saldo,
+        lastDate: last.date,
+      };
+    });
+    const ref = referenceMonth ? lastBefore(rows.map((r) => ({ key: r.key, date: r.date, saldo: r.saldo })), referenceMonth) : null;
+    return finish("CAIXA", events, ref, referenceMonth, "linhas de \"Desconto de 1%\"");
+  }
+
+  // ---------------- BANCO DO BRASIL ----------------
+  // Lançamento: dd.mm.aaaa [dd.mm.aaaa] DESCRIÇÃO  valor[C|D]
+  const BB_ENTRY = /(\d{2}\.\d{2}\.\d{4})\s+(?:(?:\d{2}\.\d{2}\.\d{4}|-{3,})\s+)?(.*?)\s*(\d{1,3}(?:\.\d{3})*,\d{2})\s*([CD])\b/g;
+
+  function bbEntries(text) {
+    const entries = [];
+    for (const raw of text.split("\n")) {
+      BB_ENTRY.lastIndex = 0;
+      let m;
+      while ((m = BB_ENTRY.exec(raw))) {
+        const desc = m[2].replace(/-{3,}/g, " ").replace(/\s+/g, " ").trim();
+        entries.push({
+          date: m[1], key: dateKey(m[1]), desc, value: toNum(m[3]), dc: m[4],
+          isSaldo: /^saldo\s+(parcial|anterior|final)/i.test(desc),
+          isCapitalC: /^capital\b/i.test(desc) && m[4] === "C",
+        });
+      }
+    }
+    return entries;
+  }
+
+  function parseBB(text, referenceMonth) {
+    const es = bbEntries(text);
+    if (es.filter((e) => e.isSaldo).length < 2) throw new AuditError("Não encontramos os lançamentos e saldos parciais do extrato do Banco do Brasil neste PDF.");
+    // Agrupa os créditos de CAPITAL por dia
+    const byDate = new Map();
+    es.forEach((e, i) => {
+      if (!e.isCapitalC) return;
+      const g = byDate.get(e.date) || { date: e.date, key: e.key, idx: [], sum: 0 };
+      g.idx.push(i); g.sum += e.value; byDate.set(e.date, g);
+    });
+    const saldoBefore = (i) => { for (let j = i - 1; j >= 0; j--) if (es[j].isSaldo && es[j].dc === "D") return es[j]; return null; };
+    const saldoAfter = (i) => { for (let j = i + 1; j < es.length; j++) if (es[j].isSaldo) return es[j]; return null; };
+    const events = [];
+    for (const g of byDate.values()) {
+      const first = g.idx[0], last = g.idx[g.idx.length - 1];
+      const before = saldoBefore(first), after = saldoAfter(last);
+      if (!before || !after) continue;
+      const massive = g.idx.length >= 3 || g.sum >= before.value * 0.03;
+      if (!massive) continue;
+      events.push({ date: g.date, key: g.key, lines: g.idx.length, originalBalance: before.value, newBalance: after.dc === "D" ? after.value : -after.value });
+    }
+    if (!events.length) throw new AuditError("Não encontramos no extrato do Banco do Brasil um bloco de créditos de CAPITAL que indique o abatimento. O abatimento ainda não foi aplicado ou o arquivo é de outro período.");
+    events.forEach((e) => { e.months = Math.round(((e.originalBalance - e.newBalance) / e.originalBalance) * 100); });
+    const saldos = es.filter((e) => e.isSaldo).map((e) => ({ key: e.key, date: e.date, saldo: e.dc === "D" ? e.value : -e.value }));
+    const ref = referenceMonth ? lastBefore(saldos, referenceMonth) : null;
+    return finish("BANCO_DO_BRASIL", events, ref, referenceMonth, "créditos de CAPITAL no dia");
+  }
+
+  // Último saldo registrado até o fim do mês de referência
+  function lastBefore(list, referenceMonth) {
+    const cut = monthEndKey(referenceMonth);
+    let hit = null;
+    for (const s of list) if (s.key <= cut && (!hit || s.key >= hit.key)) hit = s;
+    return hit;
+  }
+
+  function finish(bank, events, ref, referenceMonth, unitLabel) {
+    events.sort((a, b) => a.key - b.key);
+    const ev = events[events.length - 1];
+    const notes = [];
+    let confidence = "high";
+    if (ev.originalBalance == null) {
+      throw new AuditError("Encontramos o abatimento, mas não o saldo anterior a ele no extrato.");
+    }
+    const discountTotal = round2(ev.originalBalance - ev.newBalance);
+    if (bank === "BANCO_DO_BRASIL") {
+      notes.push(`${ev.lines} ${unitLabel} ${toBr(ev.date)}; meses calculados pelo percentual de redução do saldo.`);
+      if (ev.lines < 3) { confidence = "medium"; notes.push("Poucos créditos no dia: pode ser uma amortização antecipada, e não o abatimento. Confira."); }
+    }
+    if (bank === "CAIXA") notes.push(`${ev.months} ${unitLabel} a partir de ${toBr(ev.date)}.`);
+    if (discountTotal <= 0) { confidence = "low"; notes.push("O saldo não diminuiu após o abatimento identificado. Confira o extrato."); }
+    if (ev.months <= 0) { confidence = "low"; }
+    if (events.length > 1) {
+      notes.push("Abatimentos anteriores: " + events.slice(0, -1).map((e) =>
+        `${toBr(e.date)} (${bank === "BANCO_DO_BRASIL" ? Math.max(e.months, 0) : e.months} meses, R$ ${brl(round2(e.originalBalance - e.newBalance))})`).join("; ") + ".");
+    }
+    if (referenceMonth && !ref) notes.push(`Não há saldo devedor registrado no extrato até ${referenceMonth}.`);
+    return {
+      bank,
+      applicationDate: toBr(ev.date),
+      monthsDiscounted: Math.max(ev.months, 1),
+      originalBalance: round2(ev.originalBalance),
+      newBalance: round2(ev.newBalance),
+      discountTotal,
+      confidence,
+      notes: notes.join(" ") || null,
+      referenceBalance: ref ? round2(ref.saldo) : null,
+      referenceBalanceDate: ref ? toBr(ref.date) : null,
+    };
+  }
+
+  function auditText(text, referenceMonth) {
+    if (/Cronograma\s+Reposi/i.test(text) && !/Saldo\s+parcial/i.test(text))
+      throw new AuditError("Este é o Cronograma de Reposição do Banco do Brasil (uma projeção). Envie o extrato da operação (Consulta Operação - Extrato Subcrédito), que traz os lançamentos e os saldos parciais.");
+    const bank = detectBank(text);
+    if (bank === "BANCO_DO_BRASIL") return parseBB(text, referenceMonth);
+    if (bank === "CAIXA") return parseCaixa(text, referenceMonth);
+    throw new AuditError("Este documento não parece ser uma planilha de evolução contratual do FIES (Caixa ou Banco do Brasil).");
+  }
+
+  const api = { auditText, AuditError, caixaRows, bbEntries };
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  else root.FiesParser = api;
+})(typeof window !== "undefined" ? window : globalThis);
+</script>
+<script>
+(() => {
+  // pdf.js roda na thread principal (o worker já foi carregado como script acima)
+  if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+  const $ = (id) => document.getElementById(id);
+  const ico = (name) => `<svg class="i" aria-hidden="true"><use href="#i-${name}"/></svg>`;
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  // ---------- Toasts ----------
+  const TOAST_ICON = { success: "check", error: "x", warning: "alert", info: "info" };
+  function toast(kind, msg) {
+    const el = document.createElement("div");
+    el.className = `toast ${kind}`;
+    el.setAttribute("role", kind === "error" ? "alert" : "status");
+    el.innerHTML = `${ico(TOAST_ICON[kind])}<span>${esc(msg)}</span>`;
+    $("toasts").append(el);
+    setTimeout(() => el.remove(), kind === "error" ? 7000 : 4500);
+  }
+
+  // ---------- Formatação ----------
+  const MONTHS = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+  const BANK = { CAIXA: "Caixa Econômica Federal", BANCO_DO_BRASIL: "Banco do Brasil" };
+  const brl = (n) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  function monthLabel(v) {
+    const m = /^(\d{2})\/(\d{4})$/.exec(v); if (!m) return v;
+    const i = Number(m[1]) - 1; return i >= 0 && i < 12 ? `${MONTHS[i]}/${m[2]}` : v;
+  }
+  const maskMonth = (v) => { const d = v.replace(/\D/g, "").slice(0, 6); return d.length <= 2 ? d : `${d.slice(0, 2)}/${d.slice(2)}`; };
+  function validMonth(v) {
+    const m = /^(\d{2})\/(\d{4})$/.exec(v); if (!m) return false;
+    const mo = Number(m[1]), y = Number(m[2]);
+    return mo >= 1 && mo <= 12 && y >= 1990 && y <= new Date().getFullYear() + 1;
+  }
+  const expectedDiscount = (r) => r.referenceBalance == null || r.expectedPercent == null ? null : Math.round(r.referenceBalance * r.expectedPercent) / 100;
+
+  // ---------- Campo MM/AAAA ----------
+  const refInput = $("reference-month"), refHint = $("reference-hint");
+  const REF_DEFAULT = refHint.textContent;
+  let refTouched = false;
+  function paintRef() {
+    const v = refInput.value, ok = validMonth(v), bad = refTouched && v.length > 0 && !ok;
+    refInput.setAttribute("aria-invalid", bad);
+    refHint.classList.toggle("err", bad);
+    refHint.textContent = bad ? "Formato esperado: mês e ano, ex.: 02/2024." : ok ? `Será usado o saldo de ${monthLabel(v)}.` : REF_DEFAULT;
+  }
+  refInput.addEventListener("input", () => { refInput.value = maskMonth(refInput.value); paintRef(); });
+  refInput.addEventListener("blur", () => { refTouched = true; paintRef(); });
+
+  // ---------- Leitura do PDF (no navegador) ----------
+  const hasReadableText = (t) => (t.replace(/--- (fim da )?página \d+ ---/g, "").match(/[A-Za-zÀ-ÿ0-9]{3,}/g) ?? []).length >= 15;
+  const { auditText, AuditError } = window.FiesParser;
+
+  async function readPdfText(file) {
+    if (!window.pdfjsLib) throw new AuditError("O leitor de PDF não carregou. Recarregue a página e tente de novo.");
+    const data = new Uint8Array(await file.arrayBuffer());
+    let pdf;
+    try { pdf = await pdfjsLib.getDocument({ data, isEvalSupported: false }).promise; }
+    catch { throw new AuditError("Não foi possível abrir este arquivo. Ele está corrompido ou protegido por senha?"); }
+    const lines = [];
+    for (let p = 1; p <= pdf.numPages; p++) {
+      lines.push(`--- página ${p} ---`);
+      const content = await (await pdf.getPage(p)).getTextContent();
+      let line = "", lastY = null;
+      for (const it of content.items) {
+        if (!("str" in it)) continue;
+        const y = it.transform[5] ?? 0;
+        if (lastY !== null && Math.abs(y - lastY) > 2) { lines.push(line.trimEnd()); line = ""; }
+        line += it.str + " "; lastY = y;
+      }
+      if (line.trim()) lines.push(line.trimEnd());
+      lines.push(`--- fim da página ${p} ---`);
+    }
+    const text = lines.join("\n").trim();
+    if (!hasReadableText(text))
+      throw new AuditError("Não foi possível ler o texto do arquivo. O documento aparenta ser uma imagem/escaneado. Por favor, envie o extrato digital original emitido pelo banco.");
+    return text;
+  }
+
+  // ---------- Estado ----------
+  const records = [];
+  let loading = false;
+
+  function setLoading(v, label) {
+    loading = v;
+    $("drop").classList.toggle("busy", v);
+    $("drop-idle").hidden = v; $("drop-busy").hidden = !v;
+    $("busy-t").textContent = label || "Processando documento...";
+    refInput.disabled = v; $("expected-percent").disabled = v;
+  }
+
+  async function handleFile(file) {
+    if (!file || loading) return;
+    if (!(file.type === "application/pdf" || /\.pdf$/i.test(file.name))) { toast("error", "Apenas arquivos PDF são aceitos."); return; }
+    const pctRaw = $("expected-percent").value.trim();
+    const pct = pctRaw ? Number(pctRaw.replace(",", ".")) : null;
+    if (pct != null && (!Number.isFinite(pct) || pct <= 0 || pct > 100)) { toast("error", "Informe um percentual devido entre 0 e 100."); return; }
+    const month = refInput.value;
+    if (month && !validMonth(month)) { toast("error", "Informe o mês e o ano do saldo devedor, ex.: 02/2024."); return; }
+
+    setLoading(true);
+    try {
+      const text = await readPdfText(file);
+      const res = auditText(text, month || null);
+      records.push({ ...res, id: crypto.randomUUID(), fileName: file.name, processedAt: new Date(), referenceMonth: month || null, expectedPercent: pct });
+      render();
+      if (res.confidence === "high") toast("success", "Abatimento identificado com sucesso.");
+      else toast("warning", "Documento lido com confiança moderada. Confira os valores destacados abaixo.");
+    } catch (e) {
+      toast("error", e instanceof AuditError ? e.message : "Não foi possível processar o documento.");
+      if (!(e instanceof AuditError)) console.error(e);
+    } finally { setLoading(false); }
+  }
+
+  // ---------- Dropzone ----------
+  const drop = $("drop"), fileInput = $("file");
+  drop.addEventListener("click", () => { if (!loading) fileInput.click(); });
+  drop.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && !loading) { e.preventDefault(); fileInput.click(); } });
+  fileInput.addEventListener("change", () => { handleFile(fileInput.files?.[0]); fileInput.value = ""; });
+  const setOver = (v) => { drop.classList.toggle("over", v); $("drop-ico").innerHTML = `<use href="#i-${v ? "fileup" : "upload"}"/>`; };
+  drop.addEventListener("dragover", (e) => { e.preventDefault(); setOver(true); });
+  drop.addEventListener("dragleave", () => setOver(false));
+  drop.addEventListener("drop", (e) => { e.preventDefault(); setOver(false); handleFile(e.dataTransfer?.files?.[0]); });
+
+  $("clear").addEventListener("click", () => { records.length = 0; render(); toast("info", "Dados limpos. Envie um novo PDF quando quiser."); });
+
+  // ---------- CSV ----------
+  const csvRow = (cells) => cells.map((c) => { const s = String(c); return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }).join(";");
+  const dec = (n) => n == null ? "" : n.toFixed(2).replace(".", ",");
+  function buildCsv() {
+    const head = csvRow(["Arquivo","Banco","Data de aplicação","Meses abatidos","Saldo original (R$)","Novo saldo (R$)","Abatimento (R$)","Confiança","Mês de referência do saldo","Saldo devedor de referência (R$)","% devido","Abatimento devido (R$)","Diferença (R$)"]);
+    const rows = records.map((r) => { const exp = expectedDiscount(r); return csvRow([r.fileName, BANK[r.bank], r.applicationDate, r.monthsDiscounted, dec(r.originalBalance), dec(r.newBalance), dec(r.discountTotal), r.confidence, r.referenceMonth ?? "", dec(r.referenceBalance), r.expectedPercent ?? "", dec(exp), dec(exp == null ? null : exp - r.discountTotal)]); });
+    return "﻿" + [head, ...rows].join("\n");
+  }
+  async function exportCsv() {
+    const csv = buildCsv(), filename = `fies-auditor-${new Date().toISOString().slice(0, 10)}.csv`;
+    if (!window.claude) { // site comum: download direto pelo navegador
+      const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+      const a = document.createElement("a");
+      a.href = url; a.download = filename; document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast("success", "CSV exportado com sucesso.");
+      return;
+    }
+    const downloads = await window.claude.use?.("downloads").catch(() => null);
+    if (downloads) {
+      try { await downloads.save({ filename, data: new Blob([csv], { type: "text/csv;charset=utf-8" }) }); toast("success", "CSV exportado com sucesso."); }
+      catch (e) { if (e?.code !== "declined" && e?.code !== "cancelled") toast("error", "Não foi possível salvar o CSV."); }
+      return;
+    }
+    try { await navigator.clipboard.writeText(csv); toast("info", "Download indisponível aqui. O CSV foi copiado; cole numa planilha."); }
+    catch { toast("error", "Não foi possível exportar o CSV nesta visualização."); }
+  }
+
+  // ---------- Render ----------
+  function statCard(icon, title, value, hint) {
+    return `<div class="card stat"><div class="stat-head"><span>${esc(title)}</span>${ico(icon)}</div>
+      <p class="stat-val">${esc(value)}</p>${hint ? `<p class="stat-hint">${esc(hint)}</p>` : ""}</div>`;
+  }
+  function refBlock(r) {
+    const exp = expectedDiscount(r), diff = exp == null ? null : exp - r.discountTotal, lbl = monthLabel(r.referenceMonth ?? "");
+    if (r.referenceBalance == null)
+      return `<div class="sub"><h3>Comparativo com o saldo de ${esc(lbl)}</h3><p class="hint" style="font-size:14px">Não encontramos no extrato um saldo devedor registrado até esse mês.</p></div>`;
+    const less = diff != null && diff > 0.01;
+    return `<div class="sub"><h3>Comparativo com o saldo de ${esc(lbl)}</h3><div class="ref-grid">
+      <div><p class="lbl">Saldo em ${esc(r.referenceBalanceDate ?? lbl)}</p><p class="mid">${brl(r.referenceBalance)}</p></div>
+      <div><p class="lbl">Deveria ser abatido${r.expectedPercent == null ? "" : ` (${esc(r.expectedPercent)}%)`}</p><p class="mid">${exp == null ? "Informe o %" : brl(exp)}</p></div>
+      <div><p class="lbl">Efetivamente abatido</p><p class="mid pos">${brl(r.discountTotal)}</p></div>
+      <div><p class="lbl">Diferença</p><p class="mid ${less ? "neg" : ""}">${diff == null ? "—" : brl(diff)}</p>${less ? `<p class="hint err">Abatido a menos</p>` : ""}</div>
+    </div></div>`;
+  }
+  function render() {
+    $("clear").disabled = records.length === 0;
+    const r = records[records.length - 1], sum = $("summary"), hist = $("history");
+    sum.hidden = !r; hist.hidden = !r;
+    if (!r) { sum.innerHTML = hist.innerHTML = ""; return; }
+    const delta = r.originalBalance - r.newBalance, diverge = Math.abs(delta - r.discountTotal) > 0.011, reduced = r.newBalance < r.originalBalance;
+    sum.innerHTML = `<div class="stats">
+        ${statCard("building", "Banco emissor", r.bank === "CAIXA" ? "Caixa" : "Banco do Brasil", BANK[r.bank])}
+        ${statCard("calendar", "Data de aplicação", r.applicationDate, "Data do abatimento no contrato")}
+        ${statCard("clock", "Duração", `${r.monthsDiscounted} ${r.monthsDiscounted === 1 ? "mês" : "meses"}`, "Meses abatidos do saldo devedor")}
+        ${statCard("coins", "Valor total do abatimento", brl(r.discountTotal), diverge ? "Diverge de saldo original − novo saldo" : "")}
+      </div>
+      <div class="card cmp">
+        <div class="cmp-title">Comparativo de saldo devedor${diverge ? `<span class="badge warn">${ico("alert")} Verifique os valores</span>` : ""}</div>
+        <div class="flow">
+          <div><p class="lbl">Saldo original</p><p class="big">${brl(r.originalBalance)}</p></div>
+          <svg class="i arrow" aria-label="${reduced ? "Redução de saldo" : "Variação de saldo"}"><use href="#i-down"/></svg>
+          <div><p class="lbl">Novo saldo</p><p class="big pos">${brl(r.newBalance)}</p></div>
+          ${reduced ? `<span class="badge ok">− ${brl(delta)}</span>` : ""}
+        </div>
+        ${r.referenceMonth ? refBlock(r) : ""}
+        ${r.notes ? `<p class="notes">${esc(r.notes)}</p>` : ""}
+      </div>`;
+    hist.innerHTML = `<div class="hist-head"><h3>Histórico da sessão (${records.length})</h3>
+        <button class="btn" type="button" id="export">${ico("download")}Exportar CSV</button></div>
+      <div class="table-box"><table>
+        <thead><tr><th>Arquivo</th><th>Banco</th><th>Data de aplicação</th><th class="r">Meses</th><th class="r">Saldo original</th><th class="r">Novo saldo</th><th class="r">Abatimento</th></tr></thead>
+        <tbody>${records.map((x) => `<tr><td class="file" title="${esc(x.fileName)}">${esc(x.fileName)}</td><td>${BANK[x.bank]}</td><td>${esc(x.applicationDate)}</td><td class="r">${x.monthsDiscounted}</td><td class="r">${brl(x.originalBalance)}</td><td class="r">${brl(x.newBalance)}</td><td class="r pos" style="font-weight:600">${brl(x.discountTotal)}</td></tr>`).join("")}</tbody>
+      </table></div>`;
+    $("export").addEventListener("click", exportCsv);
+  }
+})();
+</script>
+</body>
+</html>
